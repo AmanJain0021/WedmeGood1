@@ -25,7 +25,7 @@ const ServiceProfileSetupModal = ({ subcategory, onClose, onSuccess }) => {
     setError('');
     try {
       // Call public endpoint to get templates
-      const res = await fetch(`http://localhost:5000/api/admin/form-templates`);
+      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL || (window.location.hostname === 'localhost' ? 'http://localhost:5000/api' : '/api')}/admin/form-templates`);
       const json = await res.json();
       if (json.success) {
         // Filter fields matching this category and subcategory
