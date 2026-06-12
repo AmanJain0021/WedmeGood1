@@ -226,7 +226,7 @@ const VendorSubscriptionOnboarding = () => {
             setIsSaving(true);
             try {
               // Direct mock verification bypass
-              const verifyRes = await fetch('http://localhost:5000/api/vendor/subscription/verify', {
+              const verifyRes = await fetch(`${import.meta.env.VITE_API_BASE_URL || (window.location.hostname === 'localhost' ? 'http://localhost:5000/api' : '/api')}/vendor/subscription/verify`, {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
@@ -285,7 +285,7 @@ const VendorSubscriptionOnboarding = () => {
         console.error('All Razorpay options failed, utilizing silent bypass:', fallbackErr);
         try {
           let orderId = `order_${Date.now()}`;
-          const verifyRes = await fetch('http://localhost:5000/api/vendor/subscription/verify', {
+          const verifyRes = await fetch(`${import.meta.env.VITE_API_BASE_URL || (window.location.hostname === 'localhost' ? 'http://localhost:5000/api' : '/api')}/vendor/subscription/verify`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
