@@ -5,15 +5,18 @@ import { useTheme } from '../../../hooks/useTheme';
 
 const Signup = () => {
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { register } = useAuth();
   const { theme } = useTheme();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
+    phone: '',
+    city: '',
     password: ''
   });
   const [showPassword, setShowPassword] = useState(false);
   const [agreed, setAgreed] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     // Add Designer fonts for the Lilac theme
@@ -26,10 +29,13 @@ const Signup = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!agreed) return;
+    setError('');
     
-    const result = await login(formData.email, formData.password);
+    const result = await register(formData);
     if (result.success) {
       navigate('/user/wedding-details');
+    } else {
+      setError(result.error);
     }
   };
 
@@ -61,6 +67,11 @@ const Signup = () => {
 
         {/* INPUT FIELDS - MAX COMPACTED SPACING */}
         <form onSubmit={handleSubmit} className="w-full space-y-1.5">
+          {error && (
+            <div className="w-full bg-red-100 text-red-600 rounded-xl py-2 px-4 text-xs font-semibold shadow-sm text-center">
+              {error}
+            </div>
+          )}
           <div className="space-y-1">
             <label className="text-[#5D3E3E] text-xs font-bold pl-1" style={{ fontFamily: '"Playfair Display", serif' }}>Full Name :</label>
             <input
@@ -81,6 +92,30 @@ const Signup = () => {
               onChange={(e) => setFormData({...formData, email: e.target.value})}
               className="w-full bg-white rounded-xl py-3.5 px-5 text-[#5D3E3E] text-sm font-semibold shadow-sm focus:ring-2 focus:ring-[#5D3E3E]/20 transition-all border-none placeholder-[#BE9B9B]"
               placeholder="Your email address"
+              required
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-[#5D3E3E] text-xs font-bold pl-1" style={{ fontFamily: '"Playfair Display", serif' }}>Phone Number :</label>
+            <input
+              type="tel"
+              value={formData.phone}
+              onChange={(e) => setFormData({...formData, phone: e.target.value})}
+              className="w-full bg-white rounded-xl py-3.5 px-5 text-[#5D3E3E] text-sm font-semibold shadow-sm focus:ring-2 focus:ring-[#5D3E3E]/20 transition-all border-none placeholder-[#BE9B9B]"
+              placeholder="10-digit mobile number"
+              required
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-[#5D3E3E] text-xs font-bold pl-1" style={{ fontFamily: '"Playfair Display", serif' }}>City :</label>
+            <input
+              type="text"
+              value={formData.city}
+              onChange={(e) => setFormData({...formData, city: e.target.value})}
+              className="w-full bg-white rounded-xl py-3.5 px-5 text-[#5D3E3E] text-sm font-semibold shadow-sm focus:ring-2 focus:ring-[#5D3E3E]/20 transition-all border-none placeholder-[#BE9B9B]"
+              placeholder="Your city"
               required
             />
           </div>

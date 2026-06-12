@@ -105,9 +105,14 @@ const AdminLogin = () => {
                             ) : 'Login to Console'}
                         </button>
                     </form>
-
                     <div className="mt-8 flex justify-center">
-                        <button className="text-[9px] font-black text-primary-400 opacity-60 hover:opacity-100 tracking-widest uppercase transition-opacity">Request Emergency Override</button>
+                        <button 
+                            type="button"
+                            onClick={() => navigate('/admin/forgot-password')}
+                            className="text-[9px] font-black text-primary-400 opacity-60 hover:opacity-100 tracking-widest uppercase transition-opacity"
+                        >
+                            Request Emergency Override
+                        </button>
                     </div>
                 </div>
 

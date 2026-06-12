@@ -374,8 +374,6 @@
 
 /* Custom scrollbar momentum, behavior containment, and smooth scroll controls */
 .custom-scrollbar {
-  overscroll-behavior: contain !important;
-  scroll-behavior: smooth !important;
   -webkit-overflow-scrolling: touch !important; /* Premium hardware-accelerated scroll on iOS */
 }
 

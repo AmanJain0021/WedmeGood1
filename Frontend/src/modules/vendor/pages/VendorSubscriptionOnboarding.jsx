@@ -11,7 +11,7 @@ import {
 import { useVendorState } from '../useVendorState';
 import { vendorApi } from '../vendorApi';
 
-const PREV_ROUTE = '/vendor/onboarding/portfolio';
+const PREV_ROUTE = '/vendor/register/category';
 const SUCCESS_ROUTE = '/vendor/onboarding/submitted';
 
 const MOCKUP_PLANS = [
@@ -400,8 +400,7 @@ const VendorSubscriptionOnboarding = () => {
               <div key={num} className="relative z-10">
                 <div
                   onClick={() => {
-                    if (num === 4) navigate('/vendor/onboarding/portfolio');
-                    else if (num === 3) navigate('/vendor/register/details');
+                    if (num === 3) navigate('/vendor/register/details');
                   }}
                   className={`h-[26px] w-[26px] rounded-full flex items-center justify-center text-[10px] font-bold transition-all duration-200 ${
                     isActive

@@ -38,29 +38,63 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     try {
-      // Mock authentication - simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/user/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password })
+      });
       
-      // Mock validation - accept any email/password for demo
-      if (email && password) {
+      const data = await response.json();
+      
+      if (response.ok && data.success) {
         const userData = {
-          email,
-          name: email.split('@')[0],
-          phone: '+91 98765 43210',
-          profileImage: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face',
-          weddingDate: '2024-12-15',
-          city: 'Indore',
-          isAuthenticated: true,
-          loginTime: new Date().toISOString()
+          ...data.data.user,
+          token: data.data.token,
+          isAuthenticated: true
         };
         
-        // Store user data
         localStorage.setItem('user', JSON.stringify(userData));
         setUser(userData);
         
         return { success: true, user: userData };
       } else {
-        throw new Error('Please fill in all fields');
+        const errorMsg = data.errors ? data.errors.map(e => e.msg).join(', ') : data.message;
+        throw new Error(errorMsg || 'Login failed');
+      }
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  };
+
+  const register = async (userData) => {
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/user/auth/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(userData)
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok && data.success) {
+        const newUserData = {
+          ...data.data.user,
+          token: data.data.token,
+          isAuthenticated: true
+        };
+        
+        localStorage.setItem('user', JSON.stringify(newUserData));
+        setUser(newUserData);
+        
+        return { success: true, user: newUserData };
+      } else {
+        // If express-validator returns an array of errors, join them. Otherwise use the message.
+        const errorMsg = data.errors ? data.errors.map(e => e.msg).join(', ') : data.message;
+        throw new Error(errorMsg || 'Registration failed');
       }
     } catch (error) {
       return { success: false, error: error.message };
@@ -85,6 +119,7 @@ export const AuthProvider = ({ children }) => {
     user,
     isLoading,
     login,
+    register,
     logout,
     updateUser,
     isAuthenticated

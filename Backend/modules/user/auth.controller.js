@@ -38,10 +38,6 @@ exports.register = async (req, res) => {
       });
     }
 
-    // Hash password
-    const salt = await bcrypt.genSalt(12);
-    const hashedPassword = await bcrypt.hash(password, salt);
-
     // Generate email verification OTP
     const emailOTP = generateOTP();
     const phoneOTP = generateOTP();
@@ -55,7 +51,7 @@ exports.register = async (req, res) => {
       name,
       email,
       phone,
-      password: hashedPassword,
+      password, // The model's pre('save') middleware will hash this automatically
       weddingDate: weddingDate ? new Date(weddingDate) : null,
       city,
       isEmailVerified: false,
@@ -450,12 +446,9 @@ exports.resetPassword = async (req, res) => {
       });
     }
 
-    // Hash new password
-    const salt = await bcrypt.genSalt(12);
-    const hashedPassword = await bcrypt.hash(newPassword, salt);
-
     // Update password and clear reset fields
-    user.password = hashedPassword;
+    // We pass the raw newPassword because userSchema.pre('save') will automatically hash it
+    user.password = newPassword;
     user.passwordResetToken = undefined;
     user.passwordResetExpires = undefined;
     await user.save();

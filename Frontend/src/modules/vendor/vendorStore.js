@@ -10,8 +10,12 @@ export const defaultVendorState = {
     phone: '',
     city: '',
     category: '',
+    categoryId: '',
+    subCategory: '',
+    subCategoryId: '',
     password: ''
   },
+  dynamicServiceData: {},
   verification: {
     phoneVerified: false,
     emailVerified: false

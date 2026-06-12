@@ -6,8 +6,6 @@ const VendorPublicLayout = () => {
   const normalizedPath = location.pathname.toLowerCase().replace(/\/$/, '');
   const isRegisterPage = normalizedPath.startsWith('/vendor/register');
   const isLoginPage = normalizedPath === '/vendor/login';
-  const isPortfolioOnboarding = normalizedPath === '/vendor/onboarding/portfolio';
-  const isSubscriptionOnboarding = normalizedPath === '/vendor/onboarding/subscription';
   const isAuthPage = isRegisterPage || isLoginPage;
   const hideLogo = isRegisterPage || isLoginPage || normalizedPath.startsWith('/vendor/onboarding');
   const hidePaddingX = isRegisterPage || isLoginPage || normalizedPath.startsWith('/vendor/onboarding');

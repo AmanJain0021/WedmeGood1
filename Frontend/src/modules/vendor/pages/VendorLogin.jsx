@@ -13,7 +13,7 @@ const VendorLogin = () => {
   const [password, setPassword] = useState('');
   const [showSplash, setShowSplash] = useState(true);
 
-  const { updateVendorState } = useVendorState();
+  const { updateVendorState, refreshData } = useVendorState();
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -23,6 +23,7 @@ const VendorLogin = () => {
         if (res.success) {
           localStorage.setItem('vendorToken', res.token);
           updateVendorState({ vendor: res.vendor });
+          refreshData(); // Trigger the /me API to hydrate global context
           navigate('/vendor/dashboard');
         } else {
           alert(res.message || 'Login failed');

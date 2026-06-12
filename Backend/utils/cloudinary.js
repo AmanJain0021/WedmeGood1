@@ -18,10 +18,12 @@ let storage;
 try {
     storage = new CloudinaryStorage({
         cloudinary: cloudinary,
-        params: {
-            folder: 'utsavo/portfolio',
-            allowed_formats: ['jpg', 'png', 'jpeg', 'webp', 'mp4'],
-            resource_type: 'auto'
+        params: async (req, file) => {
+            return {
+                folder: req.body.folder || 'utsavo/general',
+                allowed_formats: ['jpg', 'png', 'jpeg', 'webp', 'mp4'],
+                resource_type: 'auto'
+            };
         }
     });
 } catch (error) {

@@ -12,6 +12,15 @@ export const adminApi = {
         return await res.json();
     },
 
+    getVendorsWithServices: async (token) => {
+        const res = await fetch(`${API_URL}/vendors-services`, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+        return await res.json();
+    },
+
     getUsers: async (token) => {
         const res = await fetch(`${API_URL}/users`, {
             headers: {
@@ -29,6 +38,30 @@ export const adminApi = {
                 'Authorization': `Bearer ${token}`
             },
             body: JSON.stringify({ status })
+        });
+        return await res.json();
+    },
+
+    toggleVendorActive: async (vendorId, isActive, token) => {
+        const res = await fetch(`${API_URL}/vendors/${vendorId}/active`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ isActive })
+        });
+        return await res.json();
+    },
+
+    toggleServiceActive: async (serviceId, isActive, token) => {
+        const res = await fetch(`${API_URL}/services/${serviceId}/active`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ isActive })
         });
         return await res.json();
     },
@@ -84,8 +117,10 @@ export const adminApi = {
     },
 
     // Category Management
-    getCategories: async () => {
-        const res = await fetch(`${API_URL}/categories`);
+    getCategories: async (token) => {
+        const url = token ? `${API_URL}/categories/all` : `${API_URL}/categories`;
+        const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+        const res = await fetch(url, { headers });
         return await res.json();
     },
 
@@ -292,8 +327,83 @@ export const adminApi = {
             body: JSON.stringify(data)
         });
         return await res.json();
+    },
+
+    // SubCategories
+    getSubCategories: async (categoryId, token) => {
+        const url = categoryId ? `${API_URL}/subcategories?categoryId=${categoryId}` : `${API_URL}/subcategories`;
+        const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
+        return await res.json();
+    },
+    createSubCategory: async (data, token) => {
+        const res = await fetch(`${API_URL}/subcategories`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify(data)
+        });
+        return await res.json();
+    },
+    updateSubCategory: async (id, data, token) => {
+        const res = await fetch(`${API_URL}/subcategories/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify(data)
+        });
+        return await res.json();
+    },
+    deleteSubCategory: async (id, token) => {
+        const res = await fetch(`${API_URL}/subcategories/${id}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        return await res.json();
+    },
+
+    // FormTemplates
+    getFormTemplates: async (categoryId, subCategoryId, token) => {
+        let query = [];
+        if (categoryId) query.push(`categoryId=${categoryId}`);
+        if (subCategoryId) query.push(`subCategoryId=${subCategoryId}`);
+        const url = `${API_URL}/form-templates` + (query.length ? `?${query.join('&')}` : '');
+        const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
+        return await res.json();
+    },
+    createFormTemplate: async (data, token) => {
+        const res = await fetch(`${API_URL}/form-templates`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify(data)
+        });
+        return await res.json();
+    },
+    updateFormTemplate: async (id, data, token) => {
+        const res = await fetch(`${API_URL}/form-templates/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify(data)
+        });
+        return await res.json();
+    },
+    deleteFormTemplate: async (id, token) => {
+        const res = await fetch(`${API_URL}/form-templates/${id}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        return await res.json();
+    },
+
+    // VendorServices (Dynamic)
+    getDynamicVendorServices: async (status, token) => {
+        const url = status ? `${API_URL}/vendor-services?status=${status}` : `${API_URL}/vendor-services`;
+        const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
+        return await res.json();
+    },
+    updateVendorServiceStatus: async (id, status, token) => {
+        const res = await fetch(`${API_URL}/vendor-services/${id}/status`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({ status })
+        });
+        return await res.json();
     }
 };
-
-
-

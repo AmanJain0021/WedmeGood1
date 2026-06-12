@@ -11,11 +11,12 @@ import VendorPendingApproval from '../components/VendorPendingApproval';
 import ads1 from '../../../assets/vendor/ads1.png';
 import ads2 from '../../../assets/vendor/ads2.png';
 import ads3 from '../../../assets/vendor/ads3.png';
+import ProfileCompletionTracker from '../components/ProfileCompletionTracker';
 
 const VendorDashboard = () => {
   const navigate = useNavigate();
   const { vendorState, refreshData, loading } = useVendorState();
-  const [banners, setBanners] = useState([]);
+  const banners = vendorState.banners || [];
   const [selectedTimeRange, setSelectedTimeRange] = useState('This Month');
   const stats = vendorState.analytics || {
     profileViews: 0,
@@ -35,20 +36,6 @@ const VendorDashboard = () => {
   ];
 
   const activeBanners = banners.length > 0 ? banners : sampleBanners;
-  
-  const fetchData = async () => {
-    try {
-      const token = localStorage.getItem('vendorToken');
-      const bannersRes = await vendorApi.getDashboardBanners(token);
-      if (bannersRes.success) setBanners(bannersRes.data);
-    } catch (err) {
-      console.error('Error fetching dashboard banners:', err);
-    }
-  };
-
-  useEffect(() => {
-    fetchData();
-  }, []);
 
   // Autoscroll Logic
   useEffect(() => {
@@ -106,8 +93,20 @@ const VendorDashboard = () => {
     );
   }
 
+  if (!vendorState.isServiceProfileCompleted || vendorState.status === 'Incomplete') {
+    return (
+      <div className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8">
+        <ProfileCompletionTracker onComplete={() => refreshData()} />
+      </div>
+    );
+  }
+
   if (vendorState.status === 'Pending') {
-    return <VendorPendingApproval />;
+    return (
+      <>
+        <VendorPendingApproval />
+      </>
+    );
   }
 
   const completion = computeProfileCompletion(vendorState);
@@ -350,6 +349,7 @@ const VendorDashboard = () => {
           box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
         }
       `}</style>
+      
       {/* Stats Grid */}
       <div className="grid gap-3 sm:gap-5 grid-cols-2 lg:grid-cols-4">
         {statCards.map((stat, i) => (

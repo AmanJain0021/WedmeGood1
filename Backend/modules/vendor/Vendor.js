@@ -31,13 +31,18 @@ const vendorSchema = new mongoose.Schema({
         type: String,
         required: [true, 'Please provide your city']
     },
-    category: {
-        type: String,
-        required: [true, 'Please provide a service category']
-    },
-    subCategory: {
-        type: String,
-        default: ''
+    // Removed category and subCategory as per request, since selectedCategories handles this
+    selectedCategories: [{
+        categoryId: { type: mongoose.Schema.Types.ObjectId, ref: 'Category' },
+        categoryName: String,
+        subcategories: [{
+            subcategoryId: { type: mongoose.Schema.Types.ObjectId, ref: 'SubCategory' },
+            subcategoryName: String
+        }]
+    }],
+    isServiceProfileCompleted: {
+        type: Boolean,
+        default: false
     },
     password: {
         type: String,
@@ -62,6 +67,30 @@ const vendorSchema = new mongoose.Schema({
         serviceCities: [String]
     },
 
+    // Portfolio
+    portfolio: [{
+        title: String,
+        type: { type: String, default: 'Photo' },
+        tag: String,
+        url: String
+    }],
+
+    // Preferences & Setup
+    languages: [{
+        type: String
+    }],
+    serviceCities: [{
+        type: String
+    }],
+    hasDocuments: {
+        type: Boolean,
+        default: false
+    },
+    profileImage: {
+        type: String,
+        default: null
+    },
+
     // Services
     services: [{
         name: String,
@@ -81,13 +110,7 @@ const vendorSchema = new mongoose.Schema({
         notes: String
     },
 
-    // Portfolio
-    portfolio: [{
-        type: { type: String, enum: ['Photo', 'Video'], default: 'Photo' },
-        title: String,
-        tag: String,
-        url: String
-    }],
+    
 
     // Documents
     documents: {
@@ -110,8 +133,8 @@ const vendorSchema = new mongoose.Schema({
     },
     status: {
         type: String,
-        enum: ['Pending', 'Approved', 'Rejected'],
-        default: 'Pending'
+        enum: ['Incomplete', 'Pending', 'Approved', 'Rejected'],
+        default: 'Incomplete'
     },
     isVerified: {
         type: Boolean,
@@ -143,6 +166,10 @@ const vendorSchema = new mongoose.Schema({
     isActive: {
         type: Boolean,
         default: true
+    },
+    isServiceProfileCompleted: {
+        type: Boolean,
+        default: false
     },
     createdAt: {
         type: Date,

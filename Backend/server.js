@@ -14,6 +14,7 @@ require('dotenv').config();
 const userRoutes = require('./modules/user');
 const vendorRoutes = require('./modules/vendor');
 const adminRoutes = require('./modules/admin');
+const uploadRoutes = require('./modules/upload/upload.routes');
 const initializeAdmin = require('./utils/adminInit');
 
 // Create Express app
@@ -161,6 +162,7 @@ app.get('/api/seed-categories-secure-xyz', async (req, res) => {
 // API routes
 app.use('/api/user', userRoutes);
 app.use('/api/vendor', vendorRoutes);
+app.use('/api/upload', uploadRoutes);
 app.get('/api/admin/test', (req, res) => res.json({ success: true, message: 'Test route works' }));
 app.use('/api/admin', adminRoutes);
 

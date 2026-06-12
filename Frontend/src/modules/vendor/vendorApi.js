@@ -19,7 +19,46 @@ export const vendorApi = {
         return response.json();
     },
 
+    sendRegistrationOtp: async (phone) => {
+        const response = await fetch(`${BASE_URL}/send-otp`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ phone })
+        });
+        return response.json();
+    },
+
+    verifyRegistrationOtp: async (phone, otp) => {
+        const response = await fetch(`${BASE_URL}/verify-otp`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ phone, otp })
+        });
+        return response.json();
+    },
+
+    uploadPublicMedia: async (file) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        const response = await fetch(`${BASE_URL}/upload/public`, {
+            method: 'POST',
+            body: formData
+        });
+        return response.json();
+    },
+
+    uploadPublicMultipleMedia: async (files) => {
+        const formData = new FormData();
+        files.forEach(file => formData.append('files', file));
+        const response = await fetch(`${BASE_URL}/upload-multiple/public`, {
+            method: 'POST',
+            body: formData
+        });
+        return response.json();
+    },
+
     updateOnboarding: async (step, data, token) => {
+
         const response = await fetch(`${BASE_URL}/onboarding/${step}`, {
             method: 'PUT',
             headers: {
@@ -293,6 +332,96 @@ export const vendorApi = {
 
     getSupportConfig: async () => {
         const response = await fetch(`${BASE_URL.replace('/vendor', '/admin')}/support-config`);
+        return response.json();
+    },
+
+    // ---------------------------------
+    // Service Management
+    // ---------------------------------
+    getCategories: async () => {
+        const response = await fetch(`${BASE_URL.replace('/vendor', '/admin')}/categories`);
+        return response.json();
+    },
+
+    getServices: async (token) => {
+        const response = await fetch(`${BASE_URL}/services`, {
+            method: 'GET',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        return response.json();
+    },
+
+    createService: async (formData, token) => {
+        const response = await fetch(`${BASE_URL}/services`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` },
+            body: formData
+        });
+        return response.json();
+    },
+
+    updateService: async (id, formData, token) => {
+        const response = await fetch(`${BASE_URL}/services/${id}`, {
+            method: 'PUT',
+            headers: { 'Authorization': `Bearer ${token}` },
+            body: formData
+        });
+        return response.json();
+    },
+
+    deleteService: async (id, token) => {
+        const response = await fetch(`${BASE_URL}/services/${id}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        return response.json();
+    },
+
+    getDynamicVendorServices: async (token) => {
+        const response = await fetch(`${BASE_URL}/dynamic-services`, {
+            method: 'GET',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        return response.json();
+    },
+
+    createDynamicVendorService: async (data, token) => {
+        const response = await fetch(`${BASE_URL}/dynamic-services`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` },
+            body: data
+        });
+        return response.json();
+    },
+
+    getProfileProgress: async (token) => {
+        const response = await fetch(`${BASE_URL}/profile-progress`, {
+            method: 'GET',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        return response.json();
+    },
+
+    uploadMissingDocuments: async (data, token) => {
+        const response = await fetch(`${BASE_URL}/upload-document`, {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}` 
+            },
+            body: JSON.stringify(data)
+        });
+        return response.json();
+    },
+
+    requestApproval: async (token) => {
+        const response = await fetch(`${BASE_URL}/request-approval`, {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}` 
+            }
+        });
         return response.json();
     }
 };

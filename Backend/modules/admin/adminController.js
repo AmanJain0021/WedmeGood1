@@ -114,15 +114,89 @@ exports.deleteSubscriptionPlan = async (req, res, next) => {
 // @desc    Get all vendors
 // @route   GET /api/admin/vendors
 // @access  Private/Admin
-exports.getAllVendors = async (req, res, next) => {
-    try {
-        const vendors = await Vendor.find().sort('-createdAt');
+    exports.getAllVendors = async (req, res, next) => {
+        try {
+            const vendors = await Vendor.find({ status: { $ne: 'Incomplete' } }).lean().sort('-createdAt');
+            
+            const VendorService = require('../vendor/VendorService');
+            const vendorServices = await VendorService.find().lean();
+            
+            const mappedVendors = vendors.map(v => {
+                const dServices = vendorServices.filter(s => s.vendorId.toString() === v._id.toString()).map(s => {
+                    let subcategoryName = 'Service Details';
+                    if (v.selectedCategories) {
+                        v.selectedCategories.forEach(cat => {
+                            if (cat.subcategories) {
+                                cat.subcategories.forEach(sub => {
+                                    if (sub.subcategoryId && s.subCategoryId && sub.subcategoryId.toString() === s.subCategoryId.toString()) {
+                                        subcategoryName = sub.subcategoryName;
+                                    }
+                                });
+                            }
+                        });
+                    }
+                    return { ...s, subcategoryName };
+                });
+                return {
+                    ...v,
+                    dynamicServices: dServices
+                };
+            });
 
         res.status(200).json({
             success: true,
-            count: vendors.length,
-            data: vendors
+            count: mappedVendors.length,
+            data: mappedVendors
         });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// @desc    Get all vendors with their actual services populated
+// @route   GET /api/admin/vendors-services
+// @access  Private/Admin
+    exports.getVendorsWithServices = async (req, res, next) => {
+        try {
+            const vendors = await Vendor.find({ status: { $ne: 'Incomplete' } }).lean().sort('-createdAt');
+        const Service = require('../vendor/Service');
+        const services = await Service.find().populate('category', 'name').lean();
+
+        // Group services by vendor
+        const vendorsWithServices = vendors.map(vendor => {
+            const vendorServices = services.filter(s => s.vendor.toString() === vendor._id.toString());
+            return {
+                ...vendor,
+                actualServices: vendorServices
+            };
+        });
+
+        res.status(200).json({
+            success: true,
+            count: vendorsWithServices.length,
+            data: vendorsWithServices
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// @desc    Toggle service active status
+// @route   PUT /api/admin/services/:id/active
+// @access  Private/Admin
+exports.toggleServiceActive = async (req, res, next) => {
+    try {
+        const Service = require('../vendor/Service');
+        const service = await Service.findById(req.params.id);
+
+        if (!service) {
+            return res.status(404).json({ success: false, message: 'Service not found' });
+        }
+
+        service.isActive = req.body.isActive;
+        await service.save();
+
+        res.status(200).json({ success: true, data: service });
     } catch (err) {
         next(err);
     }
@@ -160,6 +234,37 @@ exports.updateVendorStatus = async (req, res, next) => {
         res.status(200).json({
             success: true,
             data: vendor
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// @desc    Toggle vendor active status
+// @route   PUT /api/admin/vendors/:id/active
+// @access  Private/Admin
+exports.toggleVendorActive = async (req, res, next) => {
+    try {
+        const { isActive } = req.body;
+
+        const vendor = await Vendor.findByIdAndUpdate(req.params.id, {
+            isActive
+        }, {
+            new: true,
+            runValidators: true
+        });
+
+        if (!vendor) {
+            return res.status(404).json({
+                success: false,
+                message: 'Vendor not found'
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            data: vendor,
+            message: `Vendor successfully ${isActive ? 'activated' : 'deactivated'}`
         });
     } catch (err) {
         next(err);
@@ -346,13 +451,46 @@ exports.deleteReview = async (req, res, next) => {
     }
 };
 
-// @desc    Get admin dashboard stats
+// @desc    Get all categories
 // @route   GET /api/admin/categories
 // @access  Public (for registration) / Admin
 exports.getAllCategories = async (req, res, next) => {
     try {
-        const categories = await Category.find({ isActive: true }).sort('name');
-        res.status(200).json({ success: true, data: categories });
+        const categories = await Category.find({ isActive: true }).sort('order name').lean();
+        const SubCategory = require('./SubCategory');
+        
+        // Fetch subcategories for all active categories
+        const subCategories = await SubCategory.find({ status: true }).lean();
+        
+        // Append subcategories to their respective categories
+        const categoriesWithSubs = categories.map(cat => {
+            return {
+                ...cat,
+                subCategories: subCategories.filter(sub => sub.categoryId.toString() === cat._id.toString())
+            };
+        });
+
+        res.status(200).json({ success: true, data: categoriesWithSubs });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// @desc    Get all categories for admin (including inactive)
+// @route   GET /api/admin/categories/all
+// @access  Private/Admin
+exports.getAllCategoriesAdmin = async (req, res, next) => {
+    try {
+        const categories = await Category.find({}).sort('order name').lean();
+        const SubCategory = require('./SubCategory');
+        const subCategories = await SubCategory.find({}).lean();
+        
+        const categoriesWithSubs = categories.map(cat => ({
+            ...cat,
+            subCategories: subCategories.filter(sub => sub.categoryId.toString() === cat._id.toString())
+        }));
+
+        res.status(200).json({ success: true, data: categoriesWithSubs });
     } catch (err) {
         next(err);
     }
@@ -363,12 +501,12 @@ exports.getAllCategories = async (req, res, next) => {
 // @access  Private/Admin
 exports.createCategory = async (req, res, next) => {
     try {
-        const { name, description } = req.body;
+        const { name, description, order, image, subCategories } = req.body;
         const existing = await Category.findOne({ name });
         if (existing) {
             return res.status(400).json({ success: false, message: 'Category already exists' });
         }
-        const category = await Category.create({ name, description });
+        const category = await Category.create({ name, description, order, image, subCategories });
         res.status(201).json({ success: true, data: category });
     } catch (err) {
         next(err);
@@ -380,12 +518,15 @@ exports.createCategory = async (req, res, next) => {
 // @access  Private/Admin
 exports.updateCategory = async (req, res, next) => {
     try {
-        const { name, description, isActive } = req.body;
-        const category = await Category.findByIdAndUpdate(req.params.id, {
-            name,
-            description,
-            isActive
-        }, { new: true, runValidators: true });
+        const updateData = {};
+        if (req.body.name !== undefined) updateData.name = req.body.name;
+        if (req.body.description !== undefined) updateData.description = req.body.description;
+        if (req.body.isActive !== undefined) updateData.isActive = req.body.isActive;
+        if (req.body.order !== undefined) updateData.order = req.body.order;
+        if (req.body.image !== undefined) updateData.image = req.body.image;
+        if (req.body.subCategories !== undefined) updateData.subCategories = req.body.subCategories;
+
+        const category = await Category.findByIdAndUpdate(req.params.id, updateData, { new: true, runValidators: true });
 
         if (!category) {
             return res.status(404).json({ success: false, message: 'Category not found' });
@@ -442,7 +583,7 @@ exports.updateProfile = async (req, res, next) => {
     }
 };
 
-// @desc    Change admin password
+// @desc    Change admin password   
 // @route   PUT /api/admin/profile/password
 // @access  Private/Admin
 exports.changePassword = async (req, res, next) => {
@@ -968,5 +1109,161 @@ exports.updateSupportConfig = async (req, res, next) => {
     }
 };
 
+const SubCategory = require('./SubCategory');
+const FormTemplate = require('./FormTemplate');
+const VendorService = require('../vendor/VendorService');
 
+// @desc    Get all subcategories (optionally filter by categoryId)
+// @route   GET /api/admin/subcategories
+// @access  Public (for registration) / Admin
+exports.getAllSubCategories = async (req, res, next) => {
+    try {
+        const query = req.query.categoryId ? { categoryId: req.query.categoryId } : {};
+        const subcategories = await SubCategory.find(query).populate('categoryId', 'name').sort('-createdAt');
+        res.status(200).json({ success: true, data: subcategories });
+    } catch (err) {
+        next(err);
+    }
+};
 
+// @desc    Create subcategory
+// @route   POST /api/admin/subcategories
+// @access  Private/Admin
+exports.createSubCategory = async (req, res, next) => {
+    try {
+        const subcategory = await SubCategory.create(req.body);
+        res.status(201).json({ success: true, data: subcategory });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// @desc    Update subcategory
+// @route   PUT /api/admin/subcategories/:id
+// @access  Private/Admin
+exports.updateSubCategory = async (req, res, next) => {
+    try {
+        const subcategory = await SubCategory.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
+        if (!subcategory) return res.status(404).json({ success: false, message: 'SubCategory not found' });
+        res.status(200).json({ success: true, data: subcategory });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// @desc    Delete subcategory
+// @route   DELETE /api/admin/subcategories/:id
+// @access  Private/Admin
+exports.deleteSubCategory = async (req, res, next) => {
+    try {
+        const subcategory = await SubCategory.findByIdAndDelete(req.params.id);
+        if (!subcategory) return res.status(404).json({ success: false, message: 'SubCategory not found' });
+        res.status(200).json({ success: true, message: 'SubCategory deleted' });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// @desc    Get all form templates (optionally filter by categoryId/subCategoryId)
+// @route   GET /api/admin/form-templates
+// @access  Public (for registration) / Admin
+exports.getAllFormTemplates = async (req, res, next) => {
+    try {
+        const query = {};
+        if (req.query.categoryId) query.categoryId = req.query.categoryId;
+        if (req.query.subCategoryId) {
+            query.$or = [
+                { subCategoryId: req.query.subCategoryId },
+                { subCategoryId: null },
+                { subCategoryId: { $exists: false } }
+            ];
+        }
+        const templates = await FormTemplate.find(query)
+            .populate('categoryId', 'name')
+            .populate('subCategoryId', 'name')
+            .sort('-createdAt');
+        res.status(200).json({ success: true, data: templates });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// @desc    Create form template
+// @route   POST /api/admin/form-templates
+// @access  Private/Admin
+exports.createFormTemplate = async (req, res, next) => {
+    try {
+        const template = await FormTemplate.create(req.body);
+        res.status(201).json({ success: true, data: template });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// @desc    Update form template
+// @route   PUT /api/admin/form-templates/:id
+// @access  Private/Admin
+exports.updateFormTemplate = async (req, res, next) => {
+    try {
+        const template = await FormTemplate.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
+        if (!template) return res.status(404).json({ success: false, message: 'FormTemplate not found' });
+        res.status(200).json({ success: true, data: template });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// @desc    Delete form template
+// @route   DELETE /api/admin/form-templates/:id
+// @access  Private/Admin
+exports.deleteFormTemplate = async (req, res, next) => {
+    try {
+        const template = await FormTemplate.findByIdAndDelete(req.params.id);
+        if (!template) return res.status(404).json({ success: false, message: 'FormTemplate not found' });
+        res.status(200).json({ success: true, message: 'FormTemplate deleted' });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// @desc    Get all vendor services (for approval)
+// @route   GET /api/admin/vendor-services
+// @access  Private/Admin
+exports.getAllVendorServices = async (req, res, next) => {
+    try {
+        const query = req.query.status ? { status: req.query.status } : {};
+        const vendorServices = await VendorService.find(query)
+            .populate('vendorId', 'businessName email')
+            .populate('categoryId', 'name')
+            .populate('subCategoryId', 'name')
+            .sort('-createdAt');
+        res.status(200).json({ success: true, data: vendorServices });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// @desc    Update vendor service status (Approve/Reject)
+// @route   PUT /api/admin/vendor-services/:id/status
+// @access  Private/Admin
+exports.updateVendorServiceStatus = async (req, res, next) => {
+    try {
+        const { status } = req.body;
+        if (!['Pending Approval', 'Approved', 'Rejected'].includes(status)) {
+            return res.status(400).json({ success: false, message: 'Invalid status' });
+        }
+
+        const vendorService = await VendorService.findByIdAndUpdate(req.params.id, { status }, { new: true })
+            .populate('vendorId', 'businessName email')
+            .populate('categoryId', 'name')
+            .populate('subCategoryId', 'name');
+
+        if (!vendorService) {
+            return res.status(404).json({ success: false, message: 'VendorService not found' });
+        }
+
+        res.status(200).json({ success: true, data: vendorService });
+    } catch (err) {
+        next(err);
+    }
+};

@@ -12,6 +12,7 @@ const Login = () => {
     password: ''
   });
   const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     // Add Designer fonts for the Lilac theme
@@ -23,9 +24,12 @@ const Login = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError('');
     const result = await login(formData.username, formData.password);
     if (result.success) {
       navigate('/user/dashboard');
+    } else {
+      setError(result.error);
     }
   };
 
@@ -57,14 +61,19 @@ const Login = () => {
 
         {/* INPUT FIELDS - MAX COMPACTED SPACING */}
         <form onSubmit={handleSubmit} className="w-full space-y-1.5">
+          {error && (
+            <div className="w-full bg-red-100 text-red-600 rounded-xl py-2 px-4 text-xs font-semibold shadow-sm text-center mb-2">
+              {error}
+            </div>
+          )}
           <div className="space-y-1">
-            <label className="text-[#5D3E3E] text-xs font-bold pl-1" style={{ fontFamily: '"Playfair Display", serif' }}>Username :</label>
+            <label className="text-[#5D3E3E] text-xs font-bold pl-1" style={{ fontFamily: '"Playfair Display", serif' }}>Email Address :</label>
             <input
-              type="text"
+              type="email"
               value={formData.username}
               onChange={(e) => setFormData({...formData, username: e.target.value})}
               className="w-full bg-white rounded-xl py-3.5 px-5 text-[#5D3E3E] text-sm font-semibold shadow-sm focus:ring-2 focus:ring-[#5D3E3E]/20 transition-all border-none placeholder-[#BE9B9B]"
-              placeholder="Your username"
+              placeholder="Your email address"
               required
             />
           </div>

@@ -9,27 +9,85 @@ const Message = require('./Message');
 const SupportTicket = require('./SupportTicket');
 const SubscriptionPlan = require('../admin/SubscriptionPlan');
 const Banner = require('../admin/Banner');
+const Service = require('./Service');
 const jwt = require('jsonwebtoken');
 const Razorpay = require('razorpay');
 const crypto = require('crypto');
+const { generateOTP, storeOTP, verifyOTP, sendSMSOTP, checkRateLimit } = require('../../utils/otpService');
 
 const razorpay = new Razorpay({
     key_id: process.env.RAZORPAY_KEY_ID,
     key_secret: process.env.RAZORPAY_KEY_SECRET
 });
 
+// @desc    Send Registration OTP
+// @route   POST /api/vendor/send-otp
+// @access  Public
+exports.sendRegistrationOtp = async (req, res, next) => {
+    try {
+        const { phone } = req.body;
+        const phoneRegex = /^[6-9]\d{9}$/;
+        
+        if (!phone || !phoneRegex.test(phone)) {
+            return res.status(400).json({ success: false, message: 'Invalid phone number format.' });
+        }
+
+        const phoneExists = await Vendor.findOne({ phone });
+        if (phoneExists) {
+            return res.status(400).json({ success: false, message: 'Phone number already registered.' });
+        }
+
+        const rateLimitResult = checkRateLimit(phone, 'phone_reg');
+        if (!rateLimitResult.allowed) {
+            return res.status(429).json({ success: false, message: rateLimitResult.message });
+        }
+
+        const otp = generateOTP();
+        storeOTP(phone, otp, 'phone_reg', 10);
+        await sendSMSOTP(phone, otp, 'New Vendor');
+
+        res.status(200).json({ success: true, message: 'OTP sent successfully' });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// @desc    Verify Registration OTP
+// @route   POST /api/vendor/verify-otp
+// @access  Public
+exports.verifyRegistrationOtp = async (req, res, next) => {
+    try {
+        const { phone, otp } = req.body;
+        
+        if (!phone || !otp) {
+            return res.status(400).json({ success: false, message: 'Phone and OTP are required' });
+        }
+
+        const isValid = verifyOTP(phone, otp, 'phone_reg');
+        
+        if (!isValid) {
+            return res.status(400).json({ success: false, message: 'Invalid or expired OTP' });
+        }
+
+        res.status(200).json({ success: true, message: 'OTP verified successfully' });
+    } catch (err) {
+        next(err);
+    }
+};
+
 // @desc    Register vendor
 // @route   POST /api/vendor/register
 // @access  Public
 exports.register = async (req, res, next) => {
     try {
-        const { fullName, businessName, email, phone, city, category, subCategory, password } = req.body;
+        const { fullName, businessName, email, phone, city, selectedCategories, password, portfolio, profileImage, subscriptionPlanId, languages, serviceCities, hasDocuments, idProofUrl, gstUrl } = req.body;
 
         // Phone validation
-        if (!phone || phone.length !== 10) {
+        const phoneRegex = /^[6-9]\d{9}$/;
+        if (!phone || !phoneRegex.test(phone)) {
             return res.status(400).json({
                 success: false,
-                message: 'Phone number must be exactly 10 digits'
+                message: 'Mobile number must be exactly 10 digits and start with 6, 7, 8, or 9'
             });
         }
 
@@ -53,17 +111,52 @@ exports.register = async (req, res, next) => {
             });
         }
 
-        // Create vendor
-        const vendor = await Vendor.create({
+        // Prepare vendor object
+        const vendorData = {
             fullName,
             businessName,
             email: normalizedEmail,
             phone,
             city,
-            category,
-            subCategory: subCategory || '',
-            password
-        });
+            selectedCategories: selectedCategories || [],
+            languages: Array.isArray(languages) ? languages : (languages ? languages.split(',').map(l => l.trim()) : []),
+            serviceCities: Array.isArray(serviceCities) ? serviceCities : (serviceCities ? serviceCities.split(',').map(c => c.trim()) : []),
+            hasDocuments: Boolean(hasDocuments),
+            password,
+            portfolio: portfolio || [],
+            profileImage: profileImage || null,
+            documents: {
+                idProof: idProofUrl || null,
+                gst: gstUrl || null
+            },
+            onboardingStep: 'completed',
+            isServiceProfileCompleted: false,
+            status: 'Incomplete'
+        };
+        
+        // Add pending subscription if plan was selected during onboarding
+        if (subscriptionPlanId) {
+            vendorData.subscription = {
+                planId: subscriptionPlanId,
+                status: 'Pending'
+            };
+        }
+
+
+        // Create vendor
+        const vendor = await Vendor.create(vendorData);
+
+        // Save dynamic service data if present
+        if (req.body.serviceData && Object.keys(req.body.serviceData).length > 0) {
+            const VendorService = require('./VendorService');
+            await VendorService.create({
+                vendorId: vendor._id,
+                categoryId: vendor.category,
+                subCategoryId: vendor.subCategory,
+                dynamicData: req.body.serviceData,
+                isActive: true
+            });
+        }
 
         sendTokenResponse(vendor, 201, res);
     } catch (err) {
@@ -158,7 +251,7 @@ exports.updateOnboarding = async (req, res, next) => {
                 nextStep = 'completed';
                 break;
             case 'completed':
-                updateData.status = 'Approved';
+                updateData.status = 'Pending';
                 nextStep = 'completed';
                 break;
             default:
@@ -215,7 +308,89 @@ exports.uploadMedia = async (req, res, next) => {
         res.status(200).json({
             success: true,
             url: req.file.path, // Cloudinary URL
-            public_id: req.file.filename
+            public_id: req.file.filename,
+            type: req.file.mimetype.startsWith('video') ? 'video' : 'image'
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// @desc    Upload multiple media files to Cloudinary
+// @route   POST /api/vendor/upload-multiple
+// @access  Private
+exports.uploadMultipleMedia = async (req, res, next) => {
+    try {
+        if (!req.files || req.files.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'No files uploaded'
+            });
+        }
+
+        const uploadedFiles = req.files.map(file => ({
+            url: file.path,
+            public_id: file.filename,
+            type: file.mimetype.startsWith('video') ? 'video' : 'image',
+            originalName: file.originalname
+        }));
+
+        res.status(200).json({
+            success: true,
+            files: uploadedFiles
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// @desc    Upload media to Cloudinary without auth (for registration)
+// @route   POST /api/vendor/upload/public
+// @access  Public
+exports.uploadPublicMedia = async (req, res, next) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({
+                success: false,
+                message: 'No file uploaded'
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            data: {
+                url: req.file.path,
+                public_id: req.file.filename,
+                type: req.file.mimetype.startsWith('video') ? 'video' : 'image'
+            }
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// @desc    Upload multiple media files to Cloudinary without auth
+// @route   POST /api/vendor/upload-multiple/public
+// @access  Public
+exports.uploadPublicMultipleMedia = async (req, res, next) => {
+    try {
+        if (!req.files || req.files.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'No files uploaded'
+            });
+        }
+
+        const uploadedFiles = req.files.map(file => ({
+            url: file.path,
+            public_id: file.filename,
+            type: file.mimetype.startsWith('video') ? 'video' : 'image',
+            originalName: file.originalname
+        }));
+
+        res.status(200).json({
+            success: true,
+            data: uploadedFiles
         });
     } catch (err) {
         next(err);
@@ -1017,4 +1192,371 @@ const sendTokenResponse = (vendor, statusCode, res) => {
                 onboardingStep: vendor.onboardingStep
             }
         });
+};
+
+// ==========================================
+// Service Management
+// ==========================================
+
+// @desc    Get vendor services
+// @route   GET /api/vendor/services
+// @access  Private/Vendor
+exports.getServices = async (req, res, next) => {
+    try {
+        const services = await Service.find({ vendor: req.vendor.id }).populate('category', 'name').sort('-createdAt');
+        res.status(200).json({ success: true, data: services });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// @desc    Create a new service
+// @route   POST /api/vendor/services
+// @access  Private/Vendor
+exports.createService = async (req, res, next) => {
+    try {
+        const { category, name, shortDescription, detailedDescription, features, price } = req.body;
+        
+        let parsedFeatures = [];
+        if (features) {
+            try { parsedFeatures = JSON.parse(features); } catch (e) { parsedFeatures = features; }
+        }
+
+        let parsedPrice = { original: 0, discounted: 0, currency: 'INR' };
+        if (price) {
+            try { parsedPrice = JSON.parse(price); } catch (e) {}
+        }
+
+        let coverImage = req.body.coverImage || '';
+        let gallery = [];
+        if (req.body.gallery) {
+            try { gallery = JSON.parse(req.body.gallery); } catch(e) { gallery = Array.isArray(req.body.gallery) ? req.body.gallery : [req.body.gallery]; }
+        }
+
+        if (req.files) {
+            if (req.files['coverImage'] && req.files['coverImage'][0]) {
+                coverImage = req.files['coverImage'][0].path;
+            }
+            if (req.files['gallery']) {
+                const uploadedGallery = req.files['gallery'].map(file => ({
+                    url: file.path,
+                    type: file.mimetype.startsWith('video') ? 'video' : 'image'
+                }));
+                gallery = [...gallery, ...uploadedGallery];
+            }
+        }
+
+        if (gallery.length < 5) {
+            return res.status(400).json({ success: false, message: 'Minimum 5 gallery images/videos are required.' });
+        }
+
+        const service = await Service.create({
+            vendor: req.vendor.id,
+            category,
+            name,
+            shortDescription,
+            detailedDescription,
+            features: parsedFeatures,
+            price: parsedPrice,
+            coverImage,
+            gallery
+        });
+
+        res.status(201).json({ success: true, data: service });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// @desc    Update a service
+// @route   PUT /api/vendor/services/:id
+// @access  Private/Vendor
+exports.updateService = async (req, res, next) => {
+    try {
+        let service = await Service.findOne({ _id: req.params.id, vendor: req.vendor.id });
+        if (!service) {
+            return res.status(404).json({ success: false, message: 'Service not found' });
+        }
+
+        const { category, name, shortDescription, detailedDescription, features, price, existingGallery } = req.body;
+        
+        const updateData = {};
+        if (category) updateData.category = category;
+        if (name) updateData.name = name;
+        if (shortDescription) updateData.shortDescription = shortDescription;
+        if (detailedDescription) updateData.detailedDescription = detailedDescription;
+        
+        if (features) {
+            try { updateData.features = JSON.parse(features); } catch (e) { updateData.features = features; }
+        }
+
+        if (price) {
+            try { updateData.price = JSON.parse(price); } catch (e) {}
+        }
+
+        if (req.body.coverImage) {
+            updateData.coverImage = req.body.coverImage;
+        }
+
+        if (req.files) {
+            if (req.files['coverImage'] && req.files['coverImage'][0]) {
+                updateData.coverImage = req.files['coverImage'][0].path;
+            }
+            
+            let newGallery = [];
+            if (existingGallery) {
+                let parsedExisting = [];
+                try { parsedExisting = JSON.parse(existingGallery); } catch(e) { parsedExisting = Array.isArray(existingGallery) ? existingGallery : [existingGallery]; }
+                newGallery = parsedExisting.map(item => {
+                    if (typeof item === 'string') return { url: item, type: 'image' };
+                    return item;
+                });
+            }
+            if (req.files['gallery']) {
+                const uploadedGallery = req.files['gallery'].map(file => ({
+                    url: file.path,
+                    type: file.mimetype.startsWith('video') ? 'video' : 'image'
+                }));
+                newGallery = [...newGallery, ...uploadedGallery];
+            }
+            
+            if (req.files['gallery'] || existingGallery) {
+                if (newGallery.length < 5) {
+                    return res.status(400).json({ success: false, message: 'Minimum 5 gallery images/videos are required.' });
+                }
+                updateData.gallery = newGallery;
+            }
+        } else if (existingGallery) {
+            let parsedExisting = [];
+            try { parsedExisting = JSON.parse(existingGallery); } catch(e) { parsedExisting = Array.isArray(existingGallery) ? existingGallery : [existingGallery]; }
+            updateData.gallery = parsedExisting.map(item => {
+                if (typeof item === 'string') return { url: item, type: 'image' };
+                return item;
+            });
+            
+            if (updateData.gallery.length < 5) {
+                return res.status(400).json({ success: false, message: 'Minimum 5 gallery images/videos are required.' });
+            }
+        }
+
+        service = await Service.findByIdAndUpdate(req.params.id, updateData, { new: true, runValidators: true });
+        res.status(200).json({ success: true, data: service });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// @desc    Delete a service
+// @route   DELETE /api/vendor/services/:id
+// @access  Private/Vendor
+exports.deleteService = async (req, res, next) => {
+    try {
+        const service = await Service.findOneAndDelete({ _id: req.params.id, vendor: req.vendor.id });
+        if (!service) {
+            return res.status(404).json({ success: false, message: 'Service not found' });
+        }
+        res.status(200).json({ success: true, data: {} });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// ==========================================
+// Dynamic Vendor Service Management
+// ==========================================
+
+const VendorService = require('./VendorService');
+
+// @desc    Get dynamic vendor services
+// @route   GET /api/vendor/dynamic-services
+// @access  Private/Vendor
+exports.getDynamicVendorServices = async (req, res, next) => {
+    try {
+        const vendorServices = await VendorService.find({ vendorId: req.vendor.id })
+            .populate('categoryId', 'name')
+            .populate('subCategoryId', 'name')
+            .sort('-createdAt');
+        res.status(200).json({ success: true, data: vendorServices });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// @desc    Create a new dynamic vendor service
+// @route   POST /api/vendor/dynamic-services
+// @access  Private/Vendor
+exports.createDynamicVendorService = async (req, res, next) => {
+    try {
+        const { categoryId, subCategoryId, serviceData } = req.body;
+
+        let parsedData = {};
+        if (serviceData) {
+            try { parsedData = JSON.parse(serviceData); } catch (e) { parsedData = serviceData; }
+        }
+
+        let images = [];
+        let videos = [];
+        let documents = [];
+
+        if (req.files) {
+            if (req.files['images']) {
+                images = req.files['images'].map(file => file.path);
+            }
+            if (req.files['videos']) {
+                videos = req.files['videos'].map(file => file.path);
+            }
+            if (req.files['documents']) {
+                documents = req.files['documents'].map(file => file.path);
+            }
+        }
+
+        const vendorService = await VendorService.create({
+            vendorId: req.vendor.id,
+            categoryId,
+            subCategoryId,
+            serviceData: parsedData,
+            images,
+            videos,
+            documents
+        });
+
+        res.status(201).json({ success: true, data: vendorService });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// @desc    Get profile completion progress
+// @route   GET /api/vendor/profile-progress
+// @access  Private/Vendor
+exports.getProfileProgress = async (req, res, next) => {
+    try {
+        const vendor = await Vendor.findById(req.vendor.id);
+        if (!vendor) return res.status(404).json({ success: false, message: 'Vendor not found' });
+
+        let totalItems = 0;
+        let completedItems = 0;
+
+        // --- 1. Base Registration Fields ---
+        const baseFields = ['fullName', 'businessName', 'email', 'phone', 'city'];
+        baseFields.forEach(field => {
+            totalItems++;
+            if (vendor[field]) completedItems++;
+        });
+        
+        // --- 2. Documents ---
+        const documentStatus = {
+            needed: true,
+            idProof: false,
+            gst: false
+        };
+        
+        totalItems += 2;
+        if (vendor.documents && vendor.documents.idProof) {
+            documentStatus.idProof = true;
+            completedItems++;
+        }
+        if (vendor.documents && vendor.documents.gst) {
+            documentStatus.gst = true;
+            completedItems++;
+        }
+
+        // --- 5. Form Templates / Subcategories ---
+        const subcategoryProgress = [];
+        
+        for (const cat of vendor.selectedCategories || []) {
+            for (const sub of cat.subcategories || []) {
+                totalItems += 1;
+                
+                const serviceExists = await VendorService.findOne({
+                    vendorId: vendor._id,
+                    categoryId: cat.categoryId,
+                    subCategoryId: sub.subcategoryId
+                });
+                
+                if (serviceExists) {
+                    completedItems += 1;
+                    subcategoryProgress.push({
+                        categoryId: cat.categoryId,
+                        categoryName: cat.categoryName,
+                        subcategoryId: sub.subcategoryId,
+                        subcategoryName: sub.subcategoryName,
+                        completed: true
+                    });
+                } else {
+                    subcategoryProgress.push({
+                        categoryId: cat.categoryId,
+                        categoryName: cat.categoryName,
+                        subcategoryId: sub.subcategoryId,
+                        subcategoryName: sub.subcategoryName,
+                        completed: false
+                    });
+                }
+            }
+        }
+        
+        const percentage = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 100;
+        const isComplete = percentage === 100;
+        
+        if (isComplete && !vendor.isServiceProfileCompleted) {
+            vendor.isServiceProfileCompleted = true;
+            await vendor.save();
+        }
+
+        res.status(200).json({ 
+            success: true, 
+            percentage,
+            isComplete,
+            documentStatus,
+            subcategoryProgress
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// @desc    Upload missing documents (post-registration)
+// @route   POST /api/vendor/upload-document
+// @access  Private/Vendor
+exports.uploadMissingDocuments = async (req, res, next) => {
+    try {
+        const vendor = await Vendor.findById(req.vendor.id);
+        if (!vendor) return res.status(404).json({ success: false, message: 'Vendor not found' });
+
+        const { idProofUrl, gstUrl } = req.body;
+
+        if (!vendor.documents) {
+            vendor.documents = { idProof: null, gst: null, contract: null };
+        }
+
+        if (idProofUrl) vendor.documents.idProof = idProofUrl;
+        if (gstUrl) vendor.documents.gst = gstUrl;
+
+        await vendor.save();
+
+        res.status(200).json({ success: true, message: 'Documents updated successfully', documents: vendor.documents });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// @desc    Request admin approval after completing profile
+// @route   POST /api/vendor/request-approval
+// @access  Private/Vendor
+exports.requestApproval = async (req, res, next) => {
+    try {
+        const vendor = await Vendor.findById(req.vendor.id);
+        if (!vendor) return res.status(404).json({ success: false, message: 'Vendor not found' });
+
+        if (vendor.status !== 'Incomplete') {
+            return res.status(400).json({ success: false, message: 'Vendor is already pending or approved' });
+        }
+
+        vendor.status = 'Pending';
+        await vendor.save();
+
+        res.status(200).json({ success: true, message: 'Profile submitted for verification successfully', status: vendor.status });
+    } catch (err) {
+        next(err);
+    }
 };

@@ -13,12 +13,15 @@ import AdminAnalytics from './pages/AdminAnalytics';
 import AdminBanners from './pages/AdminBanners';
 import AdminProfile from './pages/AdminProfile';
 import AdminLogin from './pages/AdminLogin';
+import AdminForgotPassword from './pages/AdminForgotPassword';
+import AdminResetPassword from './pages/AdminResetPassword';
 import AdminGateways from './pages/AdminGateways';
 import AdminVendorVerification from './pages/AdminVendorVerification';
 import AdminVendorServices from './pages/AdminVendorServices';
 import AdminCategories from './pages/AdminCategories';
+import AdminSubCategories from './pages/AdminSubCategories';
+import AdminFormTemplates from './pages/AdminFormTemplates';
 import AdminReviews from './pages/AdminReviews';
-import AdminVendorPortfolios from './pages/AdminVendorPortfolios';
 import AdminVendorLedger from './pages/AdminVendorLedger';
 import AdminPolicies from './pages/AdminPolicies';
 import AdminSupport from './pages/AdminSupport';
@@ -38,12 +41,13 @@ const AdminRoutes = () => {
   return (
     <Routes>
       <Route path="login" element={<AdminLogin />} />
+      <Route path="forgot-password" element={<AdminForgotPassword />} />
+      <Route path="reset-password" element={<AdminResetPassword />} />
       <Route element={<AdminLayout />}>
         <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<AdminDashboard />} />
         <Route path="vendors" element={<AdminVendors />} />
         <Route path="vendor-services" element={<AdminVendorServices />} />
-        <Route path="vendor-portfolios" element={<AdminVendorPortfolios />} />
         <Route path="verification" element={<AdminVendorVerification />} />
         <Route path="vendor-ledger" element={<AdminVendorLedger />} />
         <Route path="users" element={<AdminUsers />} />
@@ -53,6 +57,8 @@ const AdminRoutes = () => {
         <Route path="payments" element={<AdminPayments />} />
         <Route path="checkout" element={<AdminGateways />} />
         <Route path="categories" element={<AdminCategories />} />
+        <Route path="subcategories" element={<AdminSubCategories />} />
+        <Route path="form-templates" element={<AdminFormTemplates />} />
         <Route path="banners" element={<AdminBanners />} />
         <Route path="logs" element={<AdminLogs />} />
         <Route path="reviews" element={<AdminReviews />} />

@@ -24,20 +24,80 @@ const VendorReviewOnboarding = () => {
   const { vendorState, updateVendorState } = useVendorState();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Extract actual dynamic data or fallback elegantly to matching mocks
-  const mainCategory = vendorState.category || vendorState.registration?.category || 'Jewellery';
-  const subcategory = vendorState.subCategory || vendorState.registration?.subCategory || 'Jewellery Lead Planner';
+  // Handle category and subcategory parsing from both top-level and registration object
+  const cats = vendorState.selectedCategories?.length > 0 
+    ? vendorState.selectedCategories 
+    : vendorState.registration?.selectedCategories?.length > 0 
+      ? vendorState.registration.selectedCategories 
+      : [];
+
+  const mainCategory = cats.length > 0 
+    ? cats.map(c => c.categoryName).filter(Boolean).join(', ') 
+    : vendorState.category || vendorState.registration?.category || null;
+
+  const subcategory = cats.length > 0 
+    ? cats.map(c => c.subcategories?.map(s => s.subcategoryName).join(', ')).filter(Boolean).join(' | ')
+    : vendorState.subCategory || vendorState.registration?.subCategory || null;
   
-  const servicesCount = vendorState.services?.length || 5;
-  const businessName = vendorState.businessName || vendorState.registration?.businessName || 'ertyu';
-  const location = vendorState.city || vendorState.registration?.city || 'indore';
+  const servicesCount = vendorState.services?.length || 0;
+  const businessName = vendorState.businessName || vendorState.registration?.businessName || null;
+  const location = vendorState.city || vendorState.registration?.city || null;
   
-  const serviceAreasCount = vendorState.businessDetails?.serviceCities?.length || 4;
+  // Service Areas could be an array in businessDetails or registration, or a string in registration
+  let serviceAreasCount = 0;
+  if (vendorState.serviceCities?.length > 0) serviceAreasCount = vendorState.serviceCities.length;
+  else if (vendorState.businessDetails?.serviceCities?.length > 0) serviceAreasCount = vendorState.businessDetails.serviceCities.length;
+  else if (Array.isArray(vendorState.registration?.serviceCities) && vendorState.registration.serviceCities.length > 0) serviceAreasCount = vendorState.registration.serviceCities.length;
+  else if (typeof vendorState.registration?.serviceCities === 'string' && vendorState.registration.serviceCities.trim()) {
+    serviceAreasCount = vendorState.registration.serviceCities.split(',').length;
+  }
   
-  const localPackagesCount = localStorage.getItem('vendorPackagesCount');
-  const packagesCount = localPackagesCount ? Number(localPackagesCount) : 3;
+  const packagesCount = vendorState.pricing?.range ? 1 : 0; 
   
-  const portfolioCount = vendorState.portfolio?.length || 12;
+  const portfolioCount = vendorState.portfolio?.length || 0;
+
+  const rawReviewItems = [
+    {
+      label: 'Main Category',
+      value: mainCategory,
+      icon: <Briefcase className="w-4 h-4 text-violet-600" />
+    },
+    {
+      label: 'Subcategory',
+      value: subcategory,
+      icon: <Layers className="w-4 h-4 text-violet-600" />
+    },
+    {
+      label: 'Services',
+      value: servicesCount > 0 ? `${servicesCount} Services Selected` : null,
+      icon: <Sparkles className="w-4 h-4 text-violet-600" />
+    },
+    {
+      label: 'Business Name',
+      value: businessName,
+      icon: <Store className="w-4 h-4 text-violet-600" />
+    },
+    {
+      label: 'Location',
+      value: location,
+      icon: <MapPin className="w-4 h-4 text-violet-600" />
+    },
+    {
+      label: 'Service Areas',
+      value: serviceAreasCount > 0 ? `${serviceAreasCount} Areas` : null,
+      icon: <Compass className="w-4 h-4 text-violet-600" />
+    },
+    {
+      label: 'Pricing info',
+      value: packagesCount > 0 ? `Pricing Added` : null,
+      icon: <Package className="w-4 h-4 text-violet-600" />
+    },
+    {
+      label: 'Portfolio',
+      value: portfolioCount > 0 ? `${portfolioCount} Images` : null,
+      icon: <ImageIcon className="w-4 h-4 text-violet-600" />
+    }
+  ];
 
   const handleSubmit = async () => {
     setIsSubmitting(true);
@@ -56,48 +116,7 @@ const VendorReviewOnboarding = () => {
     }, 1200);
   };
 
-  const reviewItems = [
-    {
-      label: 'Main Category',
-      value: mainCategory,
-      icon: <Briefcase className="w-4 h-4 text-violet-600" />
-    },
-    {
-      label: 'Subcategory',
-      value: subcategory,
-      icon: <Layers className="w-4 h-4 text-violet-600" />
-    },
-    {
-      label: 'Services',
-      value: `${servicesCount} Services Selected`,
-      icon: <Sparkles className="w-4 h-4 text-violet-600" />
-    },
-    {
-      label: 'Business Name',
-      value: businessName,
-      icon: <Store className="w-4 h-4 text-violet-600" />
-    },
-    {
-      label: 'Location',
-      value: location,
-      icon: <MapPin className="w-4 h-4 text-violet-600" />
-    },
-    {
-      label: 'Service Areas',
-      value: `${serviceAreasCount} Areas`,
-      icon: <Compass className="w-4 h-4 text-violet-600" />
-    },
-    {
-      label: 'Packages',
-      value: `${packagesCount} Packages Added`,
-      icon: <Package className="w-4 h-4 text-violet-600" />
-    },
-    {
-      label: 'Portfolio',
-      value: `${portfolioCount} Images`,
-      icon: <ImageIcon className="w-4 h-4 text-violet-600" />
-    }
-  ];
+  const reviewItems = rawReviewItems.filter(item => item.value);
 
   return (
     <div
@@ -162,7 +181,6 @@ const VendorReviewOnboarding = () => {
                 <div
                   onClick={() => {
                     if (num === 5) navigate('/vendor/onboarding/subscription');
-                    else if (num === 4) navigate('/vendor/onboarding/portfolio');
                     else if (num === 3) navigate('/vendor/register/details');
                   }}
                   className={`h-[26px] w-[26px] rounded-full flex items-center justify-center text-[10px] font-bold transition-all duration-200 ${

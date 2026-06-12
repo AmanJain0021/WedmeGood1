@@ -2,12 +2,14 @@ const express = require('express');
 const {
     getAllVendors,
     updateVendorStatus,
+    toggleVendorActive,
     getStats,
     getAllSubscriptionPlans,
     createSubscriptionPlan,
     updateSubscriptionPlan,
     deleteSubscriptionPlan,
     getAllCategories,
+    getAllCategoriesAdmin,
     createCategory,
     updateCategory,
     deleteCategory,
@@ -40,11 +42,20 @@ const {
     updateFAQ,
     deleteFAQ,
     getSupportConfig,
-    updateSupportConfig
+    updateSupportConfig,
+    getVendorsWithServices,
+    toggleServiceActive,
+    getAllSubCategories,
+    createSubCategory,
+    updateSubCategory,
+    deleteSubCategory,
+    getAllFormTemplates,
+    createFormTemplate,
+    updateFormTemplate,
+    deleteFormTemplate,
+    getAllVendorServices,
+    updateVendorServiceStatus
 } = require('./adminController');
-
-
-
 const router = express.Router();
 
 const { protect, authorize } = require('../../middleware/auth.middleware');
@@ -53,6 +64,8 @@ const { upload } = require('../../utils/cloudinary');
 // Public Category Route (for vendor registration)
 // Public Support Routes
 router.get('/categories', getAllCategories);
+router.get('/subcategories', getAllSubCategories);
+router.get('/form-templates', getAllFormTemplates);
 router.get('/faqs', getAllFAQs);
 router.get('/support-config', getSupportConfig);
 
@@ -63,8 +76,11 @@ router.use(authorize('admin'));
 
 
 router.get('/vendors', getAllVendors);
+router.get('/vendors-services', getVendorsWithServices);
 router.get('/users', getAllUsers);
 router.put('/vendors/:id/status', updateVendorStatus);
+router.put('/vendors/:id/active', toggleVendorActive);
+router.put('/services/:id/active', toggleServiceActive);
 router.get('/stats', getStats);
 router.get('/subscription-plans', getAllSubscriptionPlans);
 router.post('/subscription-plans', createSubscriptionPlan);
@@ -72,9 +88,24 @@ router.put('/subscription-plans/:id', updateSubscriptionPlan);
 router.delete('/subscription-plans/:id', deleteSubscriptionPlan);
 
 // Admin Category Management
+router.get('/categories/all', getAllCategoriesAdmin);
 router.post('/categories', createCategory);
 router.put('/categories/:id', updateCategory);
 router.delete('/categories/:id', deleteCategory);
+
+// Admin SubCategory Management
+router.post('/subcategories', createSubCategory);
+router.put('/subcategories/:id', updateSubCategory);
+router.delete('/subcategories/:id', deleteSubCategory);
+
+// Admin FormTemplate Management
+router.post('/form-templates', createFormTemplate);
+router.put('/form-templates/:id', updateFormTemplate);
+router.delete('/form-templates/:id', deleteFormTemplate);
+
+// Admin VendorService Approval Management
+router.get('/vendor-services', getAllVendorServices);
+router.put('/vendor-services/:id/status', updateVendorServiceStatus);
 
 // Admin Review Management
 router.get('/reviews', getAllReviews);

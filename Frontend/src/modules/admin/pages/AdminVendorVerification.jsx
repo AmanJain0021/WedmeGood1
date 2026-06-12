@@ -108,10 +108,18 @@ const AdminVendorVerification = () => {
                                     </div>
                                     <div className="pt-1 min-w-0">
                                         <h3 className="text-base font-black text-slate-900 leading-tight truncate pr-16">{vendor.businessName}</h3>
-                                        <div className="flex items-center gap-2 mt-1.5">
-                                            <span className="px-2 py-0.5 rounded bg-primary-50 text-primary-500 text-[8px] font-black uppercase tracking-wider border border-primary-100/50">
-                                                {vendor.category}
-                                            </span>
+                                        <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                                            {vendor.selectedCategories && vendor.selectedCategories.length > 0 ? (
+                                                vendor.selectedCategories.map((cat, i) => (
+                                                    <span key={i} className="px-2 py-0.5 rounded bg-primary-50 text-primary-500 text-[8px] font-black uppercase tracking-wider border border-primary-100/50">
+                                                        {cat.categoryName}
+                                                    </span>
+                                                ))
+                                            ) : (
+                                                <span className="px-2 py-0.5 rounded bg-slate-50 text-slate-400 text-[8px] font-black uppercase tracking-wider border border-slate-100/50">
+                                                    Unspecified
+                                                </span>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
@@ -209,23 +217,55 @@ const AdminVendorVerification = () => {
                                                 <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Email Address</p>
                                                 <p className="text-[13px] font-bold text-slate-900">{selectedVendor.email}</p>
                                             </div>
-                                            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-1">
+                                            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-2">
                                                 <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Category & Location</p>
-                                                <p className="text-[13px] font-bold text-slate-900">{selectedVendor.category} • {selectedVendor.city}</p>
+                                                {selectedVendor.selectedCategories && selectedVendor.selectedCategories.length > 0 ? (
+                                                    selectedVendor.selectedCategories.map((cat, i) => (
+                                                        <div key={i}>
+                                                            <p className="text-[13px] font-bold text-slate-900 leading-tight">{cat.categoryName}</p>
+                                                            <p className="text-[10px] font-bold text-slate-500 leading-tight">
+                                                                {cat.subcategories && cat.subcategories.map(sub => sub.subcategoryName).join(', ')}
+                                                            </p>
+                                                        </div>
+                                                    ))
+                                                ) : (
+                                                    <p className="text-[13px] font-bold text-slate-400 italic">Unspecified Category</p>
+                                                )}
+                                                <div className="pt-2 border-t border-slate-200 mt-2">
+                                                    <p className="text-[12px] font-black text-slate-700 flex items-center gap-1.5">
+                                                        <Icon name="search" size="xs" color="#64748b" /> {selectedVendor.city}
+                                                    </p>
+                                                </div>
                                             </div>
                                         </div>
                                     </section>
 
                                     <section className="space-y-4">
-                                        <h4 className="text-[10px] font-black text-primary-400 uppercase tracking-widest pb-2 border-b border-primary-100">Performance Metrics</h4>
+                                        <h4 className="text-[10px] font-black text-primary-400 uppercase tracking-widest pb-2 border-b border-primary-100">Operational Coverage</h4>
                                         <div className="grid grid-cols-2 gap-3">
-                                            <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm text-center">
-                                                <p className="text-xl font-black text-slate-900">{selectedVendor.businessDetails?.years || '0'}</p>
-                                                <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mt-1">Exp. Years</p>
+                                            <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+                                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Service Cities</p>
+                                                <div className="flex flex-wrap gap-1">
+                                                    {selectedVendor.serviceCities?.length > 0 ? (
+                                                        selectedVendor.serviceCities.map((city, idx) => (
+                                                            <span key={idx} className="bg-slate-50 border border-slate-100 text-slate-700 text-[9px] font-bold px-2 py-1 rounded">{city}</span>
+                                                        ))
+                                                    ) : (
+                                                        <span className="text-[9px] font-bold text-slate-400 italic">Unspecified</span>
+                                                    )}
+                                                </div>
                                             </div>
-                                            <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm text-center">
-                                                <p className="text-xl font-black text-slate-900">{selectedVendor.businessDetails?.teamSize || '1'}</p>
-                                                <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mt-1">Team Size</p>
+                                            <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+                                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Languages</p>
+                                                <div className="flex flex-wrap gap-1">
+                                                    {selectedVendor.languages?.length > 0 ? (
+                                                        selectedVendor.languages.map((lang, idx) => (
+                                                            <span key={idx} className="bg-slate-50 border border-slate-100 text-slate-700 text-[9px] font-bold px-2 py-1 rounded">{lang}</span>
+                                                        ))
+                                                    ) : (
+                                                        <span className="text-[9px] font-bold text-slate-400 italic">Unspecified</span>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
                                     </section>
@@ -268,14 +308,132 @@ const AdminVendorVerification = () => {
 
                                 {/* Right Column: Content & Media */}
                                 <div className="lg:col-span-2 space-y-8">
-                                    <section className="space-y-4">
-                                        <h4 className="text-[10px] font-black text-primary-400 uppercase tracking-widest pb-2 border-b border-primary-100">About the Business</h4>
-                                        <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100">
-                                            <p className="text-[13px] font-medium text-slate-600 leading-relaxed italic">
-                                                "{selectedVendor.businessDetails?.description || 'No description provided yet.'}"
-                                            </p>
-                                        </div>
-                                    </section>
+                                    {selectedVendor.businessDetails?.description && (
+                                        <section className="space-y-4">
+                                            <h4 className="text-[10px] font-black text-primary-400 uppercase tracking-widest pb-2 border-b border-primary-100">About the Business</h4>
+                                            <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100 space-y-4">
+                                                <p className="text-[13px] font-medium text-slate-700 leading-relaxed">
+                                                    {selectedVendor.businessDetails.description}
+                                                </p>
+                                                <div className="flex gap-8 pt-4 border-t border-slate-200">
+                                                    <div>
+                                                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Experience</p>
+                                                        <p className="text-[14px] font-bold text-slate-900">{selectedVendor.businessDetails.years} Years</p>
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Team Size</p>
+                                                        <p className="text-[14px] font-bold text-slate-900">{selectedVendor.businessDetails.teamSize} Members</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </section>
+                                    )}
+
+                                    {selectedVendor.services && selectedVendor.services.length > 0 && (
+                                        <section className="space-y-4">
+                                            <h4 className="text-[10px] font-black text-primary-400 uppercase tracking-widest pb-2 border-b border-primary-100">Services Offered</h4>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                {selectedVendor.services.map((svc, idx) => (
+                                                    <div key={idx} className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                                                        <p className="text-[13px] font-bold text-slate-900">{svc.name}</p>
+                                                        <p className="text-[10px] font-bold text-slate-500 mb-2">{svc.category}</p>
+                                                        {svc.features && svc.features.length > 0 && (
+                                                            <div className="flex flex-wrap gap-1 mt-2">
+                                                                {svc.features.map((feat, fidx) => (
+                                                                    <span key={fidx} className="bg-white border border-slate-200 text-[9px] font-bold text-slate-600 px-2 py-1 rounded">
+                                                                        {feat}
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </section>
+                                    )}
+
+                                    {selectedVendor.pricing && (
+                                        <section className="space-y-4">
+                                            <h4 className="text-[10px] font-black text-primary-400 uppercase tracking-widest pb-2 border-b border-primary-100">Pricing Details</h4>
+                                            <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                <div>
+                                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Base Price Range</p>
+                                                    <p className="text-[14px] font-bold text-slate-900">{selectedVendor.pricing.range || 'N/A'}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Additional Notes</p>
+                                                    <p className="text-[12px] font-medium text-slate-700">{selectedVendor.pricing.notes || 'None'}</p>
+                                                </div>
+                                            </div>
+                                        </section>
+                                    )}
+
+                                    {selectedVendor.bank && (
+                                        <section className="space-y-4">
+                                            <h4 className="text-[10px] font-black text-primary-400 uppercase tracking-widest pb-2 border-b border-primary-100">Bank Details</h4>
+                                            <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100 grid grid-cols-2 sm:grid-cols-4 gap-4">
+                                                <div>
+                                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Account Name</p>
+                                                    <p className="text-[12px] font-bold text-slate-900">{selectedVendor.bank.accountName || 'N/A'}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Account Number</p>
+                                                    <p className="text-[12px] font-bold text-slate-900">{selectedVendor.bank.accountNumber || 'N/A'}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">IFSC</p>
+                                                    <p className="text-[12px] font-bold text-slate-900">{selectedVendor.bank.ifsc || 'N/A'}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">UPI ID</p>
+                                                    <p className="text-[12px] font-bold text-slate-900">{selectedVendor.bank.upiId || 'N/A'}</p>
+                                                </div>
+                                            </div>
+                                        </section>
+                                    )}
+
+                                    {selectedVendor.dynamicServices && selectedVendor.dynamicServices.length > 0 && (
+                                        <section className="space-y-4">
+                                            <h4 className="text-[10px] font-black text-primary-400 uppercase tracking-widest pb-2 border-b border-primary-100">Form Template Data</h4>
+                                            <div className="space-y-4">
+                                                {selectedVendor.dynamicServices.map((svc, idx) => (
+                                                    <div key={idx} className="bg-slate-50 p-6 rounded-3xl border border-slate-100">
+                                                        <p className="text-[11px] font-black text-primary-500 uppercase tracking-widest mb-4">{svc.subcategoryName || `Service Details #${idx + 1}`}</p>
+                                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                            {Object.entries(svc.serviceData || {}).map(([key, val], i) => (
+                                                                <div key={i}>
+                                                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">{key}</p>
+                                                                    <p className="text-[13px] font-bold text-slate-900">
+                                                                        {Array.isArray(val) ? val.join(', ') : (val || 'N/A')}
+                                                                    </p>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                        {(svc.images?.length > 0 || svc.videos?.length > 0) && (
+                                                            <div className="pt-4 border-t border-slate-200 mt-4">
+                                                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Media</p>
+                                                                <div className="flex flex-wrap gap-2">
+                                                                    {svc.images?.map((img, i) => (
+                                                                        <a key={i} href={img} target="_blank" rel="noopener noreferrer">
+                                                                            <img src={img} alt="Service media" className="h-16 w-16 rounded-xl object-cover border border-slate-200 hover:opacity-80 transition-opacity" />
+                                                                        </a>
+                                                                    ))}
+                                                                    {svc.videos?.map((vid, i) => (
+                                                                        <a key={i} href={vid} target="_blank" rel="noopener noreferrer" className="relative group block">
+                                                                            <video src={vid} className="h-16 w-16 rounded-xl object-cover border border-slate-200" />
+                                                                            <div className="absolute inset-0 bg-black/30 rounded-xl flex items-center justify-center group-hover:bg-black/40 transition-all">
+                                                                                <Icon name="play" size="sm" color="#ffffff" />
+                                                                            </div>
+                                                                        </a>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </section>
+                                    )}
 
                                     <section className="space-y-4">
                                         <h4 className="text-[10px] font-black text-primary-400 uppercase tracking-widest pb-2 border-b border-primary-100">Work Portfolio</h4>

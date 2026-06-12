@@ -3,14 +3,18 @@ import { useVendorState } from '../useVendorState';
 import { vendorApi } from '../vendorApi';
 import { computeProfileCompletion } from '../vendorStore';
 import Icon from '../../../components/ui/Icon';
+import { adminApi } from '../../admin/services/adminApi';
 
 const VendorProfile = () => {
   const { vendorState, updateVendorState, refreshData } = useVendorState();
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showApprovedCelebration, setShowApprovedCelebration] = useState(false);
+  const [profileImageFile, setProfileImageFile] = useState(null);
+  const [categories, setCategories] = useState([]);
   
   const [tempProfile, setTempProfile] = useState({ 
+    profileImage: null,
     fullName: '',
     businessName: '',
     category: '',
@@ -19,7 +23,9 @@ const VendorProfile = () => {
     businessDetails: {
       years: '',
       teamSize: '',
-      description: ''
+      description: '',
+      languages: [],
+      serviceCities: []
     },
     bank: {
       accountName: '',
@@ -32,6 +38,7 @@ const VendorProfile = () => {
   useEffect(() => {
     if (vendorState) {
       setTempProfile({
+        profileImage: vendorState.profileImage || null,
         fullName: vendorState.fullName || '',
         businessName: vendorState.businessName || '',
         category: vendorState.category || '',
@@ -40,7 +47,9 @@ const VendorProfile = () => {
         businessDetails: {
           years: vendorState.businessDetails?.years || '',
           teamSize: vendorState.businessDetails?.teamSize || '',
-          description: vendorState.businessDetails?.description || ''
+          description: vendorState.businessDetails?.description || '',
+          languages: vendorState.businessDetails?.languages || [],
+          serviceCities: vendorState.businessDetails?.serviceCities || []
         },
         bank: {
           accountName: vendorState.bank?.accountName || '',
@@ -52,11 +61,41 @@ const VendorProfile = () => {
     }
   }, [vendorState]);
 
+  const handleCategoryFocus = async () => {
+    if (categories.length === 0) {
+      try {
+        const res = await adminApi.getCategories();
+        if (res.success) setCategories(res.data);
+      } catch (err) {
+        console.error("Categories fetch failed", err);
+      }
+    }
+  };
+
   const handleSave = async () => {
     setIsSaving(true);
     try {
+      let finalProfileImage = tempProfile.profileImage;
+      
+      if (profileImageFile) {
+        const formData = new FormData();
+        formData.append('folder', 'utsavo/vendors/profile');
+        formData.append('images', profileImageFile);
+        const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+        const uploadRes = await fetch(`${BASE_URL}/upload/multiple`, { method: 'POST', body: formData });
+        const uploadData = await uploadRes.json();
+        if (uploadData.success && uploadData.data.length > 0) {
+          finalProfileImage = uploadData.data[0].url;
+        } else {
+          alert(uploadData.message || 'Failed to upload profile image');
+          setIsSaving(false);
+          return;
+        }
+      }
+
       const token = localStorage.getItem('vendorToken');
-      const res = await vendorApi.updateProfile(tempProfile, token);
+      const payload = { ...tempProfile, profileImage: finalProfileImage };
+      const res = await vendorApi.updateProfile(payload, token);
       if (res.success) {
         updateVendorState(res.data);
         setIsEditing(false);
@@ -92,14 +131,12 @@ const VendorProfile = () => {
   // Profile breakdown logic
   const getBreakdown = () => {
     const info = (vendorState.businessName && vendorState.category && vendorState.city) ? 40 : 10;
-    const payout = (vendorState.bank?.accountNumber) ? 20 : 0;
     const portfolio = (vendorState.portfolio?.length > 0) ? 30 : 5;
     const docs = (vendorState.documents?.idProof) ? 20 : 0;
     const reviews = (vendorState.reviews?.length > 0) ? 10 : 0;
     
     return [
       { label: 'Business Information', value: info, icon: 'store', color: 'indigo' },
-      { label: 'Payout Information', value: payout, icon: 'money', color: 'emerald' },
       { label: 'Service & Portfolio', value: portfolio, icon: 'image', color: 'violet' },
       { label: 'Verification & Documents', value: docs, icon: 'shield', color: 'blue' },
       { label: 'Customer Reviews', value: reviews, icon: 'star', color: 'amber' }
@@ -175,8 +212,36 @@ const VendorProfile = () => {
       `}</style>
 
       {/* Ultra-Compact Header Card */}
-      <div className="bg-white rounded-xl p-3 border border-slate-100 shadow-sm flex items-center justify-between gap-2.5">
-        <div className="space-y-1">
+      <div className="bg-white rounded-xl p-3 border border-slate-100 shadow-sm flex items-center gap-4">
+        {/* Profile Image with Edit Pencil Icon */}
+        <div className="relative w-16 h-16 rounded-full border-2 border-[#F5F3FF] shadow-sm bg-slate-100 flex-shrink-0">
+          <div className="w-full h-full rounded-full overflow-hidden flex items-center justify-center">
+            {profileImageFile ? (
+              <img src={URL.createObjectURL(profileImageFile)} alt="Profile" className="w-full h-full object-cover" />
+            ) : tempProfile.profileImage ? (
+              <img src={tempProfile.profileImage} alt="Profile" className="w-full h-full object-cover" />
+            ) : (
+              <Icon name="user" className="w-8 h-8 text-slate-300" />
+            )}
+          </div>
+          <label className="absolute bottom-0 right-0 w-6 h-6 bg-[#7C3AED] hover:bg-[#6D28D9] text-white rounded-full flex items-center justify-center cursor-pointer shadow-md transition-all active:scale-95 border-2 border-white">
+            <Icon name="edit" className="w-3.5 h-3.5 text-white" />
+            <input 
+              type="file" 
+              accept="image/*" 
+              className="hidden" 
+              onChange={(e) => {
+                if (e.target.files && e.target.files[0]) {
+                  setProfileImageFile(e.target.files[0]);
+                  // Instantly switch to edit mode so they know there are unsaved changes
+                  setIsEditing(true);
+                }
+              }}
+            />
+          </label>
+        </div>
+
+        <div className="space-y-1 flex-1">
           <div className="flex items-center gap-1.5">
             <span className="text-[7.5px] font-black uppercase tracking-wider text-[#7C3AED] bg-[#F5F3FF] px-1.5 py-0.5 rounded-sm">Management</span>
             <span className="text-[7.5px] font-black uppercase tracking-wider text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-sm border border-emerald-100">Live</span>
@@ -186,113 +251,29 @@ const VendorProfile = () => {
             <p className="text-[7.5px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">Verified Identity & Operational Details</p>
           </div>
         </div>
-        
-        <button 
-          disabled={isSaving}
-          onClick={() => isEditing ? handleSave() : setIsEditing(true)}
-          className="h-8 px-3 bg-[#7C3AED] hover:bg-[#6D28D9] text-white rounded-lg flex items-center justify-center gap-1.5 text-[9.5px] font-black uppercase tracking-wider transition-all active:scale-[0.97] shadow-md shadow-violet-100 disabled:opacity-50"
-        >
-          {isSaving ? (
-            <Icon name="loader" size="xs" className="animate-spin" />
-          ) : (
-            <Icon name={isEditing ? 'check' : 'star'} size="xs" />
-          )}
-          {isSaving ? 'Saving...' : (isEditing ? 'Save' : 'Edit Business')}
-        </button>
-      </div>
-
-
-      {/* Metrics Row (Ultra Compact with Darker Contrast) */}
-      <div className="grid grid-cols-3 gap-2.5">
-        <div className="bg-[#EEF2FF] rounded-xl p-2.5 border border-indigo-200 reveal-on-scroll">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-[7.5px] font-black text-indigo-400 uppercase tracking-tighter">Strength</span>
-            <div className="h-4.5 w-4.5 rounded-md bg-white flex items-center justify-center text-indigo-600 shadow-sm border border-indigo-100">
-              <Icon name="star" size="xs" />
-            </div>
-          </div>
-          <h3 className="text-base font-black text-slate-900 font-serif leading-none">{completion}%</h3>
-          <div className="h-0.5 w-full bg-indigo-100 rounded-full overflow-hidden mt-1.5">
-            <div className="h-full bg-indigo-600 rounded-full" style={{ width: `${completion}%` }}></div>
-          </div>
-        </div>
-
-        <div className="bg-[#ECFDF5] rounded-xl p-2.5 border border-emerald-200 reveal-on-scroll">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-[7.5px] font-black text-emerald-500 uppercase tracking-tighter">Visibility</span>
-            <div className="h-4.5 w-4.5 rounded-md bg-white flex items-center justify-center text-emerald-600 shadow-sm border border-emerald-100">
-              <Icon name="chart" size="xs" />
-            </div>
-          </div>
-          <h3 className="text-[11px] font-black text-slate-900 font-serif leading-tight">Optimization</h3>
-          <div className="flex items-center gap-1 mt-0.5">
-             <div className="h-1 w-1 rounded-full bg-emerald-600"></div>
-             <span className="text-[7.5px] font-black text-emerald-700 uppercase">Live</span>
-          </div>
-        </div>
-
-        {vendorState.status === 'Approved' ? (
-          <div 
-            onClick={() => setShowApprovedCelebration(true)}
-            className="relative overflow-hidden rounded-xl p-2.5 border border-emerald-200 bg-gradient-to-br from-[#ECFDF5] to-[#D1FAE5] reveal-on-scroll transition-all duration-500 hover:shadow-[0_8px_30px_rgb(209,250,229,0.4)] group flex flex-col justify-between cursor-pointer active:scale-[0.98]"
-          >
-            <style>{`
-              @keyframes bounceMini {
-                0%, 100% { transform: translateY(0); }
-                50% { transform: translateY(-3px); }
-              }
-              .animate-bounce-mini {
-                animation: bounceMini 2s infinite ease-in-out;
-              }
-            `}</style>
-            <div className="absolute top-0 right-0 h-8 w-8 bg-emerald-400/10 rounded-full blur-md pointer-events-none group-hover:scale-150 transition-all duration-700"></div>
-            
-            <div className="flex items-center justify-between mb-0.5 relative z-10">
-              <span className="text-[7.5px] font-black text-emerald-600 uppercase tracking-tighter animate-pulse">Status</span>
-              <div className="h-4.5 w-4.5 rounded-md bg-white flex items-center justify-center text-emerald-600 shadow-sm border border-emerald-100/50 animate-bounce-mini flex-shrink-0">
-                <Icon name="check" size="xs" />
-              </div>
-            </div>
-            
-            <div>
-              <h3 className="text-[11px] font-black text-emerald-950 font-serif leading-tight uppercase relative z-10">
-                {vendorState.status}
-              </h3>
-              <p className="text-[7.5px] font-black text-emerald-700 uppercase mt-0.5 relative z-10 tracking-wider flex items-center gap-1">
-                 <span className="relative flex h-1.5 w-1.5">
-                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                   <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
-                 </span>
-                 Portal Verified
-              </p>
-            </div>
-          </div>
-        ) : (
-          <div className="bg-[#FFF7ED] rounded-xl p-2.5 border border-orange-200 reveal-on-scroll flex flex-col justify-between">
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-[7.5px] font-black text-orange-400 uppercase tracking-tighter">Status</span>
-              <div className="h-4.5 w-4.5 rounded-md bg-white flex items-center justify-center text-orange-600 shadow-sm border border-orange-100 flex-shrink-0">
-                <Icon name="clock" size="xs" />
-              </div>
-            </div>
-            <div>
-              <h3 className="text-[11px] font-black text-slate-900 font-serif leading-tight uppercase">{vendorState.status || 'Pending'}</h3>
-              <p className="text-[7.5px] font-black text-orange-700 uppercase mt-0.5">Needs Action</p>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Section 01: Business Overview (Refined - Image 2 Style) */}
-      <div className="section-box !bg-[#F8FAFF] !p-3 reveal-on-scroll">
-        <div className="flex items-center justify-between mb-2 px-0.5">
+      <div className="section-box !bg-[#F8FAFF] !p-3 reveal-on-scroll mt-4">
+        <div className="flex items-center justify-between mb-3 px-0.5">
           <div className="flex items-center gap-2">
             <div className="h-6 w-6 rounded-lg bg-indigo-500 text-white flex items-center justify-center shadow-sm">
               <Icon name="store" size="xs" />
             </div>
             <h2 className="text-[12px] font-sans font-semibold text-slate-800 tracking-tight">Business Overview</h2>
           </div>
-          <span className="text-[7.5px] font-medium text-indigo-400 uppercase tracking-widest">Section 01</span>
+          <button 
+            disabled={isSaving}
+            onClick={() => isEditing ? handleSave() : setIsEditing(true)}
+            className="h-7 px-3 bg-[#7C3AED] hover:bg-[#6D28D9] text-white rounded-md flex items-center justify-center gap-1.5 text-[9px] font-black uppercase tracking-wider transition-all active:scale-[0.97] shadow-sm shadow-violet-100 disabled:opacity-50"
+          >
+            {isSaving ? (
+              <Icon name="loader" size="xs" className="animate-spin" />
+            ) : (
+              <Icon name={isEditing ? 'check' : 'edit'} size="xs" />
+            )}
+            {isSaving ? 'Saving...' : (isEditing ? 'Save' : 'Edit Business')}
+          </button>
         </div>
 
         <div className="space-y-1">
@@ -308,62 +289,54 @@ const VendorProfile = () => {
           <div className="grid grid-cols-2 gap-1">
             <div className="detail-card !p-2">
               <label className="detail-label !text-[7px] !font-medium">Operating Category</label>
-              <p className="detail-value !text-[11.5px] !font-semibold !text-slate-700">{tempProfile.category || 'N/A'}</p>
+              {isEditing ? (
+                <select 
+                  className="w-full bg-slate-50 border-none rounded-md px-2 py-0.5 text-[11.5px] font-medium text-slate-900 outline-none" 
+                  value={tempProfile.category} 
+                  onChange={(e) => handleChange('category', e.target.value)}
+                  onFocus={handleCategoryFocus}
+                  onClick={handleCategoryFocus}
+                >
+                  <option value="">Select Category</option>
+                  {categories.map(c => (
+                    <option key={c._id} value={c.name}>{c.name}</option>
+                  ))}
+                </select>
+              ) : (
+                <p className="detail-value !text-[11.5px] !font-semibold !text-slate-700">{tempProfile.category || 'N/A'}</p>
+              )}
             </div>
             <div className="detail-card !p-2">
               <label className="detail-label !text-[7px] !font-medium">Base City</label>
-              <p className="detail-value !text-[11.5px] !font-semibold !text-slate-700">{tempProfile.city || 'N/A'}</p>
+              {isEditing ? (
+                <input className="w-full bg-slate-50 border-none rounded-md px-2 py-0.5 text-[11.5px] font-medium text-slate-900 outline-none" value={tempProfile.city} onChange={(e) => handleChange('city', e.target.value)} />
+              ) : (
+                <p className="detail-value !text-[11.5px] !font-semibold !text-slate-700">{tempProfile.city || 'N/A'}</p>
+              )}
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-1">
             <div className="detail-card !p-2">
               <label className="detail-label !text-[7px] !font-medium">Exp. (Years)</label>
-              <p className="detail-value !text-[11.5px] !font-semibold !text-slate-700">{tempProfile.businessDetails.years || '0'} Years</p>
+              {isEditing ? (
+                <input type="number" min="0" className="w-full bg-slate-50 border-none rounded-md px-2 py-0.5 text-[11.5px] font-medium text-slate-900 outline-none" value={tempProfile.businessDetails?.years || ''} onChange={(e) => handleChange('businessDetails.years', e.target.value)} />
+              ) : (
+                <p className="detail-value !text-[11.5px] !font-semibold !text-slate-700">{tempProfile.businessDetails?.years || '0'} Years</p>
+              )}
             </div>
             <div className="detail-card !p-2">
               <label className="detail-label !text-[7px] !font-medium">Core Team Size</label>
-              <p className="detail-value !text-[11.5px] !font-semibold !text-slate-700">{tempProfile.businessDetails.teamSize || '1'} Members</p>
+              {isEditing ? (
+                <input type="number" min="1" className="w-full bg-slate-50 border-none rounded-md px-2 py-0.5 text-[11.5px] font-medium text-slate-900 outline-none" value={tempProfile.businessDetails?.teamSize || ''} onChange={(e) => handleChange('businessDetails.teamSize', e.target.value)} />
+              ) : (
+                <p className="detail-value !text-[11.5px] !font-semibold !text-slate-700">{tempProfile.businessDetails?.teamSize || '1'} Members</p>
+              )}
             </div>
           </div>
         </div>
       </div>
 
-      {/* Section 02: Payout Information */}
-      <div className="section-box !bg-[#F1FCF8] !border-[#DCFCE7] !p-3 reveal-on-scroll">
-        <div className="flex items-center justify-between mb-2 px-0.5">
-          <div className="flex items-center gap-2">
-            <div className="h-6 w-6 rounded-lg bg-emerald-500 text-white flex items-center justify-center shadow-sm">
-              <Icon name="money" size="xs" />
-            </div>
-            <h2 className="text-[12px] font-sans font-semibold text-slate-800 tracking-tight">Payout Information</h2>
-          </div>
-          <span className="text-[7.5px] font-medium text-emerald-500 uppercase tracking-widest">Section 02</span>
-        </div>
-
-        <div className="space-y-1">
-          <div className="detail-card !p-2">
-            <label className="detail-label !text-[7px] !font-medium">Settlement Account Name</label>
-            <p className="detail-value !text-[11.5px] !font-semibold !text-slate-700">{tempProfile.bank.accountName || 'Not Set'}</p>
-          </div>
-
-          <div className="detail-card !p-2">
-            <label className="detail-label !text-[7px] !font-medium">Bank Account Number</label>
-            <p className="detail-value !text-[11.5px] !font-semibold !text-slate-700 tracking-wider">{tempProfile.bank.accountNumber || 'Not Set'}</p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-1">
-            <div className="detail-card !p-2">
-              <label className="detail-label !text-[7px] !font-medium">IFSC Routing Code</label>
-              <p className="detail-value !text-[11.5px] !font-semibold !text-slate-700">{tempProfile.bank.ifsc || 'Not Set'}</p>
-            </div>
-            <div className="detail-card !p-2">
-              <label className="detail-label !text-[7px] !font-medium">UPI ID for Quick Payout</label>
-              <p className="detail-value !text-[11.5px] !font-semibold !text-indigo-600 lowercase">{tempProfile.bank.upiId || 'Not Set'}</p>
-            </div>
-          </div>
-        </div>
-      </div>
 
       {/* Profile Strength Breakdown (Refined - Medium Weight) */}
       <div className="section-box !bg-white !p-4 border-slate-100 reveal-on-scroll">

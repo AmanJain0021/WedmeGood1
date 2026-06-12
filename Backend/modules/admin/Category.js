@@ -16,6 +16,14 @@ const categorySchema = new mongoose.Schema({
         type: String,
         trim: true
     },
+    image: {
+        type: String,
+        trim: true
+    },
+    order: {
+        type: Number,
+        default: 0
+    },
     isActive: {
         type: Boolean,
         default: true
