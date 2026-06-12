@@ -65,7 +65,7 @@ app.use(helmet({
 }));
 
 // CORS configuration
-const allowedOrigins = process.env.ALLOWED_ORIGINS
+let allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim())
   : [
     'http://localhost:5173',
@@ -78,6 +78,10 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
     'https://wed-me-good-lake.vercel.app',
     'https://wedme-good1.vercel.app'
   ];
+
+if (!allowedOrigins.includes('https://wedme-good1.vercel.app')) {
+  allowedOrigins.push('https://wedme-good1.vercel.app');
+}
 
 app.use(cors({
   origin: function (origin, callback) {
